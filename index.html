@@ -285,18 +285,18 @@ td:first-child{color:var(--blue);width:44%} td:last-child{color:var(--pen)}
   <div class="row">
     <div class="col" style="flex:2 1 460px">
       <canvas id="c-rc" width="640" height="300"></canvas>
-      <label class="ctl">Resistance <b id="rv">10 kΩ</b></label>
-      <input type="range" id="r-slider" min="1" max="100" value="10">
-      <label class="ctl">Capacitance <b id="cv2">10 µF</b></label>
-      <input type="range" id="c2-slider" min="1" max="100" value="10">
+      <label class="ctl">Resistance <b id="rv">20 kΩ</b></label>
+      <input type="range" id="r-slider" min="5" max="50" value="20">
+      <label class="ctl">Capacitance <b id="cv2">20 µF</b></label>
+      <input type="range" id="c2-slider" min="5" max="50" value="20">
       <div class="predict">Predict first: I double R and halve C. Does this curve move?</div>
     </div>
     <div class="col">
       <div class="work">
         <p style="margin:0;font-size:1.05rem">RC · dv/dt + v = V<sub>s</sub></p>
         <p style="margin:.4rem 0 0;font-size:1.05rem">v(t) = V<sub>s</sub>(1 − e<sup>−t/RC</sup>)</p>
-        <p class="readout" style="margin:.6rem 0 0">τ = <b id="tau">100 ms</b> ·
-        5τ = <b id="t5">500 ms</b></p>
+        <p class="readout" style="margin:.6rem 0 0">τ = <b id="tau">400 ms</b> ·
+        5τ = <b id="t5">2.00 s</b></p>
       </div>
       <div class="numq" data-a="47" data-tol="3">
         <p class="qq">You need τ = 470 ms with a 10 µF capacitor. What resistance, in kΩ?</p>
@@ -988,20 +988,30 @@ function dJ(){const cv=$("#c-j");if(!cv)return;const x=fit(cv),W=cv.width,H=cv.h
 ["#r-slider","#c2-slider"].forEach(s=>$(s).oninput=dRc);
 function dRc(){const cv=$("#c-rc");if(!cv)return;const x=fit(cv),W=cv.width,H=cv.height,
   d=devicePixelRatio||1,p=18*d;frame(x,W,H,p);
-  const R=+$("#r-slider").value,C=+$("#c2-slider").value,tau=R*C;
-  $("#rv").textContent=R+" kΩ";$("#cv2").textContent=C+" µF";
-  const fm=v=>v>=1000?(v/1000).toFixed(2)+" s":v+" ms";
+  const R=+$("#r-slider").value,C=+$("#c2-slider").value,tau=R*C;   // ms
+  $("#rv").textContent=R+" k\u03a9";$("#cv2").textContent=C+" \u00b5F";
+  const fm=v=>v>=1000?(v/1000).toFixed(2)+" s":Math.round(v)+" ms";
   $("#tau").textContent=fm(tau);$("#t5").textContent=fm(5*tau);
-  const base=H-p*1.6,A=H-2.6*p,N=600,P=[];
-  for(let i=0;i<=N;i++){const t=i/N*6*tau;P.push([p+(W-2*p)*i/N,base-A*(1-Math.exp(-t/tau))]);}
-  const xt=p+(W-2*p)/6;x.setLineDash([5*d,5*d]);
-  poly(x,[[xt,base],[xt,base-A*.632]],MUT,1.4*d);
-  poly(x,[[p,base-A*.632],[xt,base-A*.632]],MUT,1.4*d);
-  poly(x,[[p,base-A],[W-p,base-A]],MUT,1.4*d);x.setLineDash([]);
+  // FIXED time window. The curve must genuinely move when RC changes, otherwise
+  // "double R, halve C" demonstrates nothing.
+  const TMAX=2000, X=t=>p+(W-2*p)*t/TMAX;
+  const base=H-p*2.1, A=H-3.4*p, N=700, P=[];
+  for(let i=0;i<=N;i++){const t=i/N*TMAX;P.push([X(t),base-A*(1-Math.exp(-t/tau))]);}
+  x.setLineDash([5*d,5*d]);
+  poly(x,[[p,base-A],[W-p,base-A]],MUT,1.4*d);
+  poly(x,[[p,base-A*.632],[W-p,base-A*.632]],MUT,1.1*d);
+  if(tau<TMAX){poly(x,[[X(tau),base],[X(tau),base-A*.632]],PEN,1.7*d);}
+  x.setLineDash([]);
   poly(x,P,BLUE,3*d);
-  lab(x,"63%",p+5*d,base-A*.632-7*d,MUT,12*d);lab(x,"Vs",p+5*d,base-A-7*d,MUT,12*d);
-  lab(x,"τ",xt-4*d,base+15*d,PEN,14*d);
-  lab(x,"one time constant, whatever R and C you chose",p+28*d,base+15*d,MUT,12*d);}
+  x.strokeStyle=MUT;x.lineWidth=d;x.beginPath();x.moveTo(p,base);x.lineTo(W-p,base);x.stroke();
+  for(let t=0;t<=TMAX;t+=500){x.beginPath();x.moveTo(X(t),base);x.lineTo(X(t),base+4*d);x.stroke();
+    lab(x,(t/1000).toFixed(1)+"s",X(t)-11*d,base+18*d,MUT,11*d);}
+  lab(x,"63%",p+5*d,base-A*.632-7*d,MUT,12*d);
+  lab(x,"Vs",p+5*d,base-A-7*d,MUT,12*d);
+  if(tau<TMAX)lab(x,"\u03c4",X(tau)-4*d,base+18*d,PEN,15*d);
+  else lab(x,"\u03c4 is off the right of this window",W-190*d,p+13*d,PEN,12*d);
+  lab(x,"the time axis is fixed \u2014 only the product RC moves this curve",
+      p+6,p+13*d,MUT,12*d);}
 
 /* ---------- 7 matrix ---------- */
 ["#r1","#r2","#r3"].forEach(s=>$(s).oninput=dMat);
